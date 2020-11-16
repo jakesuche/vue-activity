@@ -1,5 +1,5 @@
 <template>
-  <div id="activityApp">
+  <div  v-if="categories && activities" id="activityApp">
     <nav class="navbar is-white topNav">
       <div class="container">
         <div class="navbar-brand">
@@ -7,94 +7,44 @@
         </div>
       </div>
     </nav>
-    <nav class="navbar is-white">
-      <div class="container">
-        <div class="navbar-menu">
-          <div class="navbar-start">
-            <a
-              class="navbar-item is-active"
-              href="#"
-            >Newest</a>
-            <a
-              class="navbar-item"
-              href="#"
-            >In Progress</a>
-            <a
-              class="navbar-item"
-              href="#"
-            >Finished</a>
-          </div>
-        </div>
-      </div>
-    </nav>
+   <!-- nav bar start  component -->
+    <theNavbar/>
+   
     <section class="container">
       <div class="columns">
+        <!-- activity for starts -->
         <div class="column is-3">
-          <a
-            v-if="!isFormDisplayed"
-            class="button is-primary is-block is-alt is-large"
-            href="#"
-            @click="toggleFormDisplay"
-          >New Activity</a>
-          <div
-            v-if="isFormDisplayed"
-            class="create-form"
-          >
-            <h2>Create Activity</h2>
-            <form>
-              <div class="field">
-                <label class="label">Title</label>
-                <div class="control">
-                  <input
-                    v-model="newActivity.title"
-                    class="input"
-                    type="text"
-                    placeholder="Read a Book"
-                  >
-                </div>
-              </div>
-              <div class="field">
-                <label class="label">Notes</label>
-                <div class="control">
-                  <textarea
-                    v-model="newActivity.notes"
-                    class="textarea"
-                    placeholder="Write some notes here"
-                  />
-                </div>
-              </div>
-              <div class="field is-grouped">
-                <div class="control">
-                  <button
-                    class="button is-link"
-                    :disabled="!isFormValid"
-                    @click="createActivity"
-                  >
-                    Create Activity
-                  </button>
-                </div>
-                <div class="control">
-                  <button
-                    class="button is-text"
-                    @click="toggleFormDisplay"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
+          <Activitycreate @activityCreated="AddActivity"
+            v-bind:categories = categories
+          
+          />
         </div>
+      
+        <!-- activity form ends -->
         <div class="column is-9">
-          <div class="box content">
-            <Activityitem
+          <div class="box content" :class="{fetching: isFetching, 'has-error':error}">
+            <div v-if="error">
+              {{error}}
+            </div>
+            <div v-else>
+              <div v-if="isFetching">
+                Loading .....
+              </div>
+              
+
+              <Activityitem
               v-for="activity in activities"
               :key="activity.id"
               :activity="activity"
+              :categories="categories"
             />
-            <div class="activity-length"> currently {{ activityLength }} activities</div>
-            <div class="activity-Motivation"> {{activityMotivation}}</div> 
-          </div>
+            </div>
+
+              <div v-if="!isFetching">
+                <div class="activity-length"> currently {{ activityLength }} activities</div>
+                <div class="activity-Motivation"> {{activityMotivation}}</div> 
+              </div>
+             </div>
         </div>
       </div>
     </section>
@@ -102,30 +52,41 @@
 </template>
 
 <script>
+import Vue from 'vue'
+import theNavbar from './components/theNavbar'
  import Activityitem from './components/ActivityItem'
+ import Activitycreate from './components/Activitycreate'
  import { fetchActivities, fetcategories, fetchusers  } from './api/index'
  
  
 export default {
 
   name: 'App',
-  components: { Activityitem },
+  components: {
+    theNavbar,
+    Activityitem,
+
+    Activitycreate
+   
+   },
    data () {
     return {
       isFormDisplayed: false,
       creator:'Jake Uche',
       appName:'Activity planner',
-      message: 'Hello Vue!',
+      message: 'Hello Vue!', 
       titleMessage: 'Title Message Vue!!!!!',
       isTextDisplayed: true,
       newActivity: {
         title: '',
-        notes: ''
+        notes: '',
+        category:''
       },
-      items: {1: {name: 'Filip'}, 2: {name: 'John'}},
-        user: {},
-        activities : {},
-         categories: {}, 
+     isFetching:false,
+     error:null,
+      user: {},
+      activities : null,
+      categories:null, 
 
     }
    },
@@ -138,7 +99,8 @@ export default {
       },
       activityLength(){
        
-        return Object.keys(this.activities).length
+        return Object.keys(this.activities).length 
+        
       },
       activityMotivation(){
         if(this.activityLength && this.activityLength < 5 ){
@@ -154,9 +116,23 @@ export default {
      console.log("before called")
    },
    created() {
-         this.activities = fetchActivities()
+          this.isFetching = true
+        //  this.activities = fetchActivities()
+          fetchActivities()
+          .then((activities)=>{
+            this.activities = activities
+            this.isFetching = false
+          })
+          .catch(error =>{
+            console.log(error)
+            this.error = error
+            this.isFetching = false
+          })
          this.user = fetchusers()
-         this.categories = fetcategories()
+        fetcategories().then(categories =>{
+          this.categories = categories
+        })
+         console.log(this.categories)
     },
      beforeMount(){
       console.log('before mount called')
@@ -171,9 +147,14 @@ export default {
     toggleFormDisplay () {
       this.isFormDisplayed = !this.isFormDisplayed
     },
-    createActivity () {
-      console.log(this.newActivity)
-    },
+    AddActivity(newActivity){
+     // this.activities[newActivity.id]= newActivity
+     // vue.set is used to add an object
+      Vue.set(this.activities, newActivity.id, newActivity)
+      console.log('activity from this activity check', this.activities)
+      console.log('activity passed to app.vue',newActivity)
+    }  
+   
     // isFormValid(){
     //   return this.newActivity.title && this.newActivity.notes
     // }
@@ -197,7 +178,16 @@ export default {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   color: #2c3e50;
+
 }
+
+.has-error{
+  border: red 2px solid;
+}
+.fetching{
+  border:orange 2px solid
+}
+
 html,body {
   font-family: 'Open Sans', serif;
   background: #F2F6FA;
